@@ -76,15 +76,13 @@ let buildings = {
 canvas.addEventListener('click', (e) => {
     //finds tile player just clicked
     //jesus christ up above in heaven have mercy on my soul
-    //let tile = buildings[(Math.floor((1 / tileScale) * (e.offsetX - (canvas.width / 2) + tileScale / 2))).toString() + "," + (Math.floor(-(1 / tileScale) * (e.offsetY - (canvas.height / 2) - tileScale / 2))).toString()]
-    console.log(tile)
+    let tile = buildings[(Math.floor((1 / tileScale) * (e.offsetX - origin.x))).toString() + "," + (Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))).toString()]
 
 }, false)
 
 canvas.addEventListener('mousedown', (e) => {
     translation.x = e.offsetX
     translation.y = e.offsetY
-    console.log(translation)
 })
 
 canvas.addEventListener('mousemove', (e) => {
@@ -98,9 +96,11 @@ canvas.addEventListener('mousemove', (e) => {
     }
 })
 
-
-console.log(origin)
-gridLines("grid")
+canvas.addEventListener('wheel', (e) => {
+    mapScale += e.deltaY/50
+    if (mapScale == 0) mapScale += 2
+    tileScale = canvas.width / mapScale
+})
 
 let loop = function (timestamp) {
     let deltaTime = timestamp - oldTime

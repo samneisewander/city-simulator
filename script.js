@@ -38,18 +38,18 @@ let translation = {
     "x": 0,
     "y": 0
 }
-let money = 100
-let population = 5
+let money = 10
+let population = 10
 let time = 0
 let oldTime = 0
 
 class Building {
-    constructor(x, y) {
+    constructor(x, y, cost) {
         this.x = x
         this.y = y
         this.sprite
 
-        this.cost
+        this.cost = cost
         this.hitpoints
     }
     draw() {
@@ -72,7 +72,7 @@ class Building {
 }
 class Factory extends Building {
     constructor(x, y) {
-        super(x, y)
+        super(x, y, 10)
         this.income = 10// $/hour at peak
         this.size = 10// # People that can work here
         this.workforce = 0// # People here currently
@@ -81,7 +81,7 @@ class Factory extends Building {
 }
 class House extends Building {
     constructor(x, y) {
-        super(x, y)
+        super(x, y, 10)
         this.size = 10
         this.contains = 0
         this.color = "blue"
@@ -95,18 +95,14 @@ class Highlight {
     }
     draw() {
         if (this.sprite == null) {
-            ctx.fillStyle = this.color ? this.color : "gray"
+            ctx.fillStyle = this.color ? this.color : "#e8e8e8"
             ctx.fillRect(origin.x + (this.x * tileScale), origin.y - (this.y * tileScale), tileScale, tileScale)
         }
         else ctx.drawImage(origin.x + (this.x * tileScale), origin.y - (this.y * tileScale), tileScale, tileScale)
     }
 }
 let buildings = {
-    "0,0": new House(0, 0),
-    "1,0": new House(1, 0),
-    "0,1": new Factory(0, 1),
-    "10,1": new Factory(10, 1),
-    "-2,0": new House(-2, 0)
+    "0,0": new House(0, 0)
 }
 let highlight
 
@@ -116,20 +112,27 @@ c_main.addEventListener('click', (e) => {
     let coords = [Math.floor((1 / tileScale) * (e.offsetX - origin.x)),Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))]
     let tile = buildings[coords[0].toString() + "," + coords[1].toString()]
 
-    if(c_hotbar.placing[0]) {
+    if(c_hotbar.placing[0] && !tile) {
+        let build
         switch(c_hotbar.placing[1]){
             case "house":
-                buildings[coords[0].toString() + "," + coords[1].toString()] = new House(coords[0], coords[1])
+                build = new House(coords[0], coords[1])
                 if (!e.shiftKey) c_hotbar.placing[0] = false
                 break
             case "factory":
-                buildings[coords[0].toString() + "," + coords[1].toString()] = new Factory(coords[0], coords[1])
+                build = new Factory(coords[0], coords[1])
                 if (!e.shiftKey) c_hotbar.placing[0] = false
                 break
             default:
                 console.log("uh oh")
                 break
         }
+        if (money >= build.cost){
+            money -= build.cost
+            highlight = new Highlight(coords[0], coords[1], "rgba(224, 224, 224, 0.8)")
+            buildings[coords[0].toString() + "," + coords[1].toString()] = build
+        }
+        
     }
 }, false)
 
@@ -142,7 +145,7 @@ c_main.addEventListener('mousedown', (e) => {
 c_main.addEventListener('mousemove', (e) => {
     let tile = buildings[(Math.floor((1 / tileScale) * (e.offsetX - origin.x))).toString() + "," + (Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))).toString()]
 
-    tile ? highlight = new Highlight(tile.x, tile.y, "rgba(224, 224, 224, 0.8)") : highlight = new Highlight(Math.floor((1 / tileScale) * (e.offsetX - origin.x)), Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y)), "gray")
+    tile ? highlight = new Highlight(tile.x, tile.y, "rgba(224, 224, 224, 0.8)") : highlight = new Highlight(Math.floor((1 / tileScale) * (e.offsetX - origin.x)), Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y)), "#dbdbdb")
 
     if (e.buttons == 1 && c_main.isDragging) {
         deltaX = e.offsetX - translation.x
@@ -169,6 +172,14 @@ c_main.addEventListener('wheel', (e) => {
     tileScale = c_main.width / mapScale
 })
 
+document.body.addEventListener('keydown', (e) => {
+    switch(e.key){
+        case "Escape":
+            if(c_hotbar.placing[0]) c_hotbar.placing[0] = false
+            break
+    }
+})
+
 ctx_hotbar.beginPath()
 ctx_hotbar.fillStyle = "blue"
 ctx_hotbar.fillRect(0,0,100,100)
@@ -185,12 +196,15 @@ let loop = function (timestamp) {
     time += deltaTime
     ctx.clearRect(0, 0, c_main.width, c_main.height)
 
-
     if (c_hotbar.placing[0]) gridLines("grid")
     for (i of Object.keys(buildings)) {
         buildings[i].draw()
     }
     if (highlight) highlight.draw()
+
+    ctx.fillStyle = "black"
+    ctx.font = "15px 'Roboto Mono', monospace"
+    ctx.fillText("Population: " + population.toString() + "   Money: $" + money.toString(), c_main.width - 270, 30)
     requestAnimationFrame(loop)
     oldTime = timestamp
 }

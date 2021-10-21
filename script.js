@@ -24,6 +24,9 @@ c_hotbar.placing = [false, null]
  - Add money and population production and consumption logic
  - Add random fires that destroy buildings.
 
+
+    BUGS
+ - Type is not defined ahhhhhh
     Im an uncle haha lol
 */
 
@@ -38,10 +41,16 @@ let translation = {
     "x": 0,
     "y": 0
 }
-let money = 10
+let money = 10000
 let population = 10
 let time = 0
 let oldTime = 0
+let gameSpeed = 2000 //ms in an ingame hour
+let percentOfHour = (time % gameSpeed)/gameSpeed
+let hoursPassed = 0//how many total hours have passed
+let timeOfDay = 0//hour of day in military format
+let daysPassed = 0//how many total days have passed
+let isMorning = true
 
 class Building {
     constructor(x, y, cost) {
@@ -59,15 +68,23 @@ class Building {
         }
         else ctx.drawImage(origin.x + (this.x * tileScale), origin.y - (this.y * tileScale), tileScale, tileScale)
     }
-    detectAdjacent(building, radius, type) {
+    detectAdjacent(range, type) {
         let data = []
         let adjacent = []
-
-
-        for (i of adjacent) {
-            if (i instanceof type) data.push(i)
+        //ry and rx: coordinates relative to target
+        for (let ry = -range; ry <= range; ry++) {
+            for (let rx = -range; rx <= range; rx++) {
+                if (buildings[(this.x + rx).toString() + "," + (this.y + ry).toString()]) adjacent.push(buildings[(this.x + rx).toString() + "," + (this.y + ry).toString()])
+            }
         }
-
+        if (type) {
+            console.log(type)
+            for (i of adjacent) {
+                    if (i instanceof type) data.push(i)
+            }
+        }
+        else data = adjacent
+        return data
     }
 }
 class Factory extends Building {
@@ -76,6 +93,7 @@ class Factory extends Building {
         this.income = 10// $/hour at peak
         this.size = 10// # People that can work here
         this.workforce = 0// # People here currently
+        this.hours = [9, 17]
         this.color = "red"
     }
 }
@@ -84,7 +102,9 @@ class House extends Building {
         super(x, y, 10)
         this.size = 10
         this.contains = 0
+        this.working = 0
         this.color = "blue"
+        this.range = 1
     }
 }
 class Highlight {
@@ -109,12 +129,12 @@ let highlight
 c_main.addEventListener('click', (e) => {
     //finds tile player just clicked
     //jesus christ up above in heaven have mercy on my soul
-    let coords = [Math.floor((1 / tileScale) * (e.offsetX - origin.x)),Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))]
+    let coords = [Math.floor((1 / tileScale) * (e.offsetX - origin.x)), Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))]
     let tile = buildings[coords[0].toString() + "," + coords[1].toString()]
 
-    if(c_hotbar.placing[0] && !tile) {
+    if (c_hotbar.placing[0] && !tile) {
         let build
-        switch(c_hotbar.placing[1]){
+        switch (c_hotbar.placing[1]) {
             case "house":
                 build = new House(coords[0], coords[1])
                 if (!e.shiftKey) c_hotbar.placing[0] = false
@@ -127,13 +147,13 @@ c_main.addEventListener('click', (e) => {
                 console.log("uh oh")
                 break
         }
-        if (money >= build.cost){
+        if (money >= build.cost) {
             money -= build.cost
             highlight = new Highlight(coords[0], coords[1], "rgba(224, 224, 224, 0.8)")
             buildings[coords[0].toString() + "," + coords[1].toString()] = build
         }
-        
     }
+    tile ? console.log(tile.detectAdjacent(2, Factory)) : null
 }, false)
 
 c_main.addEventListener('mousedown', (e) => {
@@ -167,24 +187,24 @@ c_main.addEventListener('mouseup', (e) => {
 })
 
 c_main.addEventListener('wheel', (e) => {
-    mapScale += e.deltaY/50
+    mapScale += e.deltaY / 50
     if (mapScale <= 0) mapScale = 2
     tileScale = c_main.width / mapScale
 })
 
 document.body.addEventListener('keydown', (e) => {
-    switch(e.key){
+    switch (e.key) {
         case "Escape":
-            if(c_hotbar.placing[0]) c_hotbar.placing[0] = false
+            if (c_hotbar.placing[0]) c_hotbar.placing[0] = false
             break
     }
 })
 
 ctx_hotbar.beginPath()
 ctx_hotbar.fillStyle = "blue"
-ctx_hotbar.fillRect(0,0,100,100)
+ctx_hotbar.fillRect(0, 0, 100, 100)
 ctx_hotbar.fillStyle = "red"
-ctx_hotbar.fillRect(0,100,100,100)
+ctx_hotbar.fillRect(0, 100, 100, 100)
 
 c_hotbar.addEventListener('click', (e) => {
     if (e.offsetY > 0 && e.offsetY < 100) c_hotbar.placing = [!c_hotbar.placing[0], "house"]
@@ -194,10 +214,24 @@ c_hotbar.addEventListener('click', (e) => {
 let loop = function (timestamp) {
     let deltaTime = timestamp - oldTime
     time += deltaTime
+    percentOfHour = (time % gameSpeed)/gameSpeed
+    hoursPassed = Math.floor(time/gameSpeed) //how many total hours have passed
+    timeOfDay = hoursPassed % 24 //hour of day in military format
+    isMorning = timeOfDay < 12 ? true : false
+    daysPassed = Math.floor(hoursPassed / 24) //how many total days have passed
+
     ctx.clearRect(0, 0, c_main.width, c_main.height)
 
     if (c_hotbar.placing[0]) gridLines("grid")
     for (i of Object.keys(buildings)) {
+        let target = buildings[i]
+        switch(target.constructor.name){
+            case House:
+                let adjacent = target.detectAdjacent(target.range, Factory)
+                if (target.working < target.contains){
+                    
+                }
+        }
         buildings[i].draw()
     }
     if (highlight) highlight.draw()
@@ -205,6 +239,7 @@ let loop = function (timestamp) {
     ctx.fillStyle = "black"
     ctx.font = "15px 'Roboto Mono', monospace"
     ctx.fillText("Population: " + population.toString() + "   Money: $" + money.toString(), c_main.width - 270, 30)
+    ctx.fillText("Time: " + (isMorning ? (timeOfDay + 1).toString() + " AM" : (timeOfDay - 11).toString() + " PM"), 10, 30)
     requestAnimationFrame(loop)
     oldTime = timestamp
 }

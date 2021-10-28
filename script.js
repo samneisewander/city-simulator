@@ -14,6 +14,16 @@ c_hotbar.height = 500
 c_hotbar.style.border = '2px solid black'
 c_hotbar.isDragging = false
 c_hotbar.placing = [false, null]
+let mapScale = 20 //Dimemsion of map in tiles
+let tileScale = c_main.width / mapScale //Width and height of tiles
+let origin = {
+    "x": c_main.width / 2 - tileScale / 2,
+    "y": c_main.height / 2 - tileScale / 2
+}
+let translation = {
+    "x": 0,
+    "y": 0
+}
 
 /* TODO
  - Add building tiles to hotbar
@@ -26,32 +36,26 @@ c_hotbar.placing = [false, null]
 
 
     BUGS
- - Type is not defined ahhhhhh
+ - DeltaHours not working for money production calculation ln 250 or something
     Im an uncle haha lol
 */
 
-//Global Variables!!!
-let mapScale = 20 //Dimemsion of map in tiles
-let tileScale = c_main.width / mapScale //Width and height of tiles
-let origin = {
-    "x": c_main.width / 2 - tileScale / 2,
-    "y": c_main.height / 2 - tileScale / 2
-}
-let translation = {
-    "x": 0,
-    "y": 0
-}
-let money = 10000
-let population = 10
+//time
 let time = 0
 let oldTime = 0
 let gameSpeed = 2000 //ms in an ingame hour
-let percentOfHour = (time % gameSpeed)/gameSpeed
+let percentOfHour = (time % gameSpeed) / gameSpeed
 let hoursPassed = 0//how many total hours have passed
 let timeOfDay = 0//hour of day in military format
 let daysPassed = 0//how many total days have passed
 let isMorning = true
 
+//game stats
+let population
+let populationTicker = 10
+let money = 10
+
+//classes
 class Building {
     constructor(x, y, cost) {
         this.x = x
@@ -78,9 +82,8 @@ class Building {
             }
         }
         if (type) {
-            console.log(type)
             for (i of adjacent) {
-                    if (i instanceof type) data.push(i)
+                if (i instanceof type) data.push(i)
             }
         }
         else data = adjacent
@@ -90,10 +93,10 @@ class Building {
 class Factory extends Building {
     constructor(x, y) {
         super(x, y, 10)
-        this.income = 10// $/hour at peak
-        this.size = 10// # People that can work here
-        this.workforce = 0// # People here currently
-        this.hours = [9, 17]
+        this.income = 1.5 // $/hour at peak
+        this.size = 10 // # People that can work here
+        this.workforce = [] //People that work here
+        this.hours = [8, 16] //working hours (time ranges from 0 to 23, inclusive)
         this.color = "red"
     }
 }
@@ -101,8 +104,7 @@ class House extends Building {
     constructor(x, y) {
         super(x, y, 10)
         this.size = 10
-        this.contains = 0
-        this.working = 0
+        this.contains = []
         this.color = "blue"
         this.range = 1
     }
@@ -121,11 +123,24 @@ class Highlight {
         else ctx.drawImage(origin.x + (this.x * tileScale), origin.y - (this.y * tileScale), tileScale, tileScale)
     }
 }
+class Person {
+    constructor(gender, job){
+        this.gender = gender ? gender : pickRandom(["male","female"])
+        this.name = generateName(gender)
+        this.job = job ? job : "unemployed"
+    }
+}
+
+//buildings
 let buildings = {
     "0,0": new House(0, 0)
 }
 let highlight
+for(i = 0; i < buildings["0,0"].size; i++){
+    buildings["0,0"].contains.push(new Person())
+}
 
+//listeners
 c_main.addEventListener('click', (e) => {
     //finds tile player just clicked
     //jesus christ up above in heaven have mercy on my soul
@@ -153,7 +168,7 @@ c_main.addEventListener('click', (e) => {
             buildings[coords[0].toString() + "," + coords[1].toString()] = build
         }
     }
-    tile ? console.log(tile.detectAdjacent(2, Factory)) : null
+    if (tile) console.log(tile)
 }, false)
 
 c_main.addEventListener('mousedown', (e) => {
@@ -200,51 +215,83 @@ document.body.addEventListener('keydown', (e) => {
     }
 })
 
+//the fucking hotbar.
 ctx_hotbar.beginPath()
 ctx_hotbar.fillStyle = "blue"
 ctx_hotbar.fillRect(0, 0, 100, 100)
 ctx_hotbar.fillStyle = "red"
 ctx_hotbar.fillRect(0, 100, 100, 100)
 
+//hotbar listeners
 c_hotbar.addEventListener('click', (e) => {
     if (e.offsetY > 0 && e.offsetY < 100) c_hotbar.placing = [!c_hotbar.placing[0], "house"]
     else if (e.offsetY > 100 && e.offsetY < 200) c_hotbar.placing = [!c_hotbar.placing[0], "factory"]
 })
 
+//functions
 let loop = function (timestamp) {
     let deltaTime = timestamp - oldTime
     time += deltaTime
-    percentOfHour = (time % gameSpeed)/gameSpeed
-    hoursPassed = Math.floor(time/gameSpeed) //how many total hours have passed
+    percentOfHour = (time % gameSpeed) / gameSpeed
+    hoursPassed = Math.floor(time / gameSpeed) //how many total hours have passed
     timeOfDay = hoursPassed % 24 //hour of day in military format
     isMorning = timeOfDay < 12 ? true : false
     daysPassed = Math.floor(hoursPassed / 24) //how many total days have passed
 
+    let addPerson = Math.floor(populationTicker) - population > 0 ? true : false
+    let populationUp = [false, false] //flag to check if there is empty housing and empty employment
+
+    population = Math.floor(populationTicker) //pop rounded to a whole #
     ctx.clearRect(0, 0, c_main.width, c_main.height)
 
     if (c_hotbar.placing[0]) gridLines("grid")
     for (i of Object.keys(buildings)) {
         let target = buildings[i]
-        switch(target.constructor.name){
-            case House:
-                let adjacent = target.detectAdjacent(target.range, Factory)
-                if (target.working < target.contains){
-                    
+        switch (target.constructor.name) {
+            case "House":
+                let adjacentFactories = target.detectAdjacent(target.range, Factory)
+                //checks if there are idle people that can be employed at nearby Factories. If so, it employs them.
+                let unemployed = []
+                    for (let element of target.contains){
+                        if (element.job == "unemployed") unemployed.push(element)
                 }
+                if (unemployed.length > 0) {
+                    for (factory of adjacentFactories) {
+                        if (factory.workforce.length < factory.size) {
+                            let toEmploy = unemployed.splice(0, factory.size - factory.workforce.length)
+                            for (let worker of toEmploy){
+                                factory.workforce.push(worker)
+                                worker.job = factory
+                            }
+                        }
+                    }
+                }
+                if (target.contains.length < target.size) {
+                    populationUp[0] = true
+                    if (addPerson) {
+                        target.contains.push(new Person())
+                        addPerson = false
+                    }
+                }
+                break
+            case "Factory":
+                if (timeOfDay >= target.hours[0] && timeOfDay < target.hours[1]) {
+                    money += ((deltaTime % gameSpeed) / gameSpeed) * (target.workforce.length / target.size) * target.income
+                }
+                if (target.workforce.length < target.size) populationUp[1] = true
         }
-        buildings[i].draw()
+        target.draw()
     }
+    if (populationUp[0] == true && populationUp[1] == true) populationTicker += ((deltaTime % gameSpeed) / gameSpeed)
     if (highlight) highlight.draw()
 
     ctx.fillStyle = "black"
     ctx.font = "15px 'Roboto Mono', monospace"
-    ctx.fillText("Population: " + population.toString() + "   Money: $" + money.toString(), c_main.width - 270, 30)
+    ctx.fillText("Population: " + population.toString() + "   Money: $" + money.toFixed(2), c_main.width - 270, 30)
     ctx.fillText("Time: " + (isMorning ? (timeOfDay + 1).toString() + " AM" : (timeOfDay - 11).toString() + " PM"), 10, 30)
     requestAnimationFrame(loop)
     oldTime = timestamp
 }
-
-requestAnimationFrame(loop)
 
 function gridLines(style) {
     switch (style) {
@@ -272,3 +319,5 @@ function gridLines(style) {
             break
     }
 }
+
+requestAnimationFrame(loop)

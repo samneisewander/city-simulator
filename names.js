@@ -8,7 +8,7 @@ function pickRandom(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
-function generateName(gender){
-    if (!gender) gender = pickRandom(["male", "female"])
-    return pickRandom(gender = "male" ? maleNames.data : femaleNames.data) + " " + pickRandom(lastNames.data)
+function generateName(sex){
+    if (!sex) sex = pickRandom(["male", "female"])
+    return pickRandom(sex = "male" ? maleNames.data : femaleNames.data) + " " + pickRandom(lastNames.data)
 }

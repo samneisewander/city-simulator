@@ -3,8 +3,10 @@ const c_main = document.createElement('canvas')
 const c_hotbar = document.createElement('canvas')
 const ctx_hotbar = c_hotbar.getContext('2d')
 const ctx = c_main.getContext('2d')
-document.body.appendChild(c_main)
-document.body.appendChild(c_hotbar)
+let info = document.getElementById("info")
+let gameDiv = document.getElementById("game")
+game.appendChild(c_main)
+game.appendChild(c_hotbar)
 c_main.width = 500
 c_main.height = 500
 c_main.style.border = '2px solid black'
@@ -26,18 +28,11 @@ let translation = {
 }
 
 /* TODO
- - Add building tiles to hotbar
- - Fix dragging main from offscreen
- - Add drag and drop logic to main
- - Add gridlines to map
- - Add money and population counters to main
- - Add money and population production and consumption logic
- - Add random fires that destroy buildings.
+    - Fix how the info screen looks lol
 
 
     BUGS
- - DeltaHours not working for money production calculation ln 250 or something
-    Im an uncle haha lol
+ 
 */
 
 //time
@@ -104,7 +99,7 @@ class House extends Building {
     constructor(x, y) {
         super(x, y, 10)
         this.size = 10
-        this.contains = []
+        this.housing = []
         this.color = "blue"
         this.range = 1
     }
@@ -124,9 +119,9 @@ class Highlight {
     }
 }
 class Person {
-    constructor(gender, job){
-        this.gender = gender ? gender : pickRandom(["male","female"])
-        this.name = generateName(gender)
+    constructor(sex, job){
+        this.sex = sex ? sex : pickRandom(["male","female"])
+        this.name = generateName(sex)
         this.job = job ? job : "unemployed"
     }
 }
@@ -137,7 +132,7 @@ let buildings = {
 }
 let highlight
 for(i = 0; i < buildings["0,0"].size; i++){
-    buildings["0,0"].contains.push(new Person())
+    buildings["0,0"].housing.push(new Person())
 }
 
 //listeners
@@ -146,7 +141,6 @@ c_main.addEventListener('click', (e) => {
     //jesus christ up above in heaven have mercy on my soul
     let coords = [Math.floor((1 / tileScale) * (e.offsetX - origin.x)), Math.ceil(-(1 / tileScale) * (e.offsetY - origin.y))]
     let tile = buildings[coords[0].toString() + "," + coords[1].toString()]
-
     if (c_hotbar.placing[0] && !tile) {
         let build
         switch (c_hotbar.placing[1]) {
@@ -168,7 +162,7 @@ c_main.addEventListener('click', (e) => {
             buildings[coords[0].toString() + "," + coords[1].toString()] = build
         }
     }
-    if (tile) console.log(tile)
+    if (tile) displayInfo(tile)
 }, false)
 
 c_main.addEventListener('mousedown', (e) => {
@@ -252,7 +246,7 @@ let loop = function (timestamp) {
                 let adjacentFactories = target.detectAdjacent(target.range, Factory)
                 //checks if there are idle people that can be employed at nearby Factories. If so, it employs them.
                 let unemployed = []
-                    for (let element of target.contains){
+                    for (let element of target.housing){
                         if (element.job == "unemployed") unemployed.push(element)
                 }
                 if (unemployed.length > 0) {
@@ -266,10 +260,10 @@ let loop = function (timestamp) {
                         }
                     }
                 }
-                if (target.contains.length < target.size) {
+                if (target.housing.length < target.size) {
                     populationUp[0] = true
                     if (addPerson) {
-                        target.contains.push(new Person())
+                        target.housing.push(new Person())
                         addPerson = false
                     }
                 }
@@ -287,7 +281,7 @@ let loop = function (timestamp) {
 
     ctx.fillStyle = "black"
     ctx.font = "15px 'Roboto Mono', monospace"
-    ctx.fillText("Population: " + population.toString() + "   Money: $" + money.toFixed(2), c_main.width - 270, 30)
+    ctx.fillText("Population: " + population.toString() + "   Pizza: $" + money.toFixed(2), c_main.width - 270, 30)
     ctx.fillText("Time: " + (isMorning ? (timeOfDay + 1).toString() + " AM" : (timeOfDay - 11).toString() + " PM"), 10, 30)
     requestAnimationFrame(loop)
     oldTime = timestamp
@@ -318,6 +312,36 @@ function gridLines(style) {
             ctx.stroke()
             break
     }
+}
+
+function displayInfo(tile){
+    let type = tile.constructor.name
+    let keys = Object.keys(tile)
+    let itemBox = document.getElementById("items")
+    let header = document.getElementById("info-h1")
+
+    header.innerHTML = tile.constructor.name
+    for (let key of keys){
+        let valid = ["size", "housing", "range", "hours", "income", "workforce"]
+        if (valid.includes(key)){
+            let value = tile[key]
+            let element = document.createElement('div')
+            if(typeof value !== "object") element.innerHTML = capitalize(key) + ": " + value 
+            else {
+                element.innerHTML = capitalize(key) + ":"
+                for (i of value){
+                    element.innerHTML += " " + i.name + ","
+                }
+                element.innerHTML = element.innerHTML.substring(0, element.innerHTML.length - 1)
+            }
+            itemBox.appendChild(element)
+        }
+    }
+}
+
+const capitalize = (s) => {
+    if (typeof s !== 'string') return ''
+    return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 requestAnimationFrame(loop)

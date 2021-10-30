@@ -5,3 +5,17 @@ canvas{
 html{
     margin: 0px;
 }
+
+body{
+    font-family: 'Abel', sans-serif;
+}
+
+#game{
+    display: flex;
+    justify-content: center;
+}
+
+#info{
+    display: flex;
+    
+}

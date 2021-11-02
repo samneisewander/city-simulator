@@ -16,6 +16,14 @@ body{
 }
 
 #info{
+    user-select: none;
+    margin: auto;
+    width:600px;
+    height: fit-content
+}
+
+#items{
     display: flex;
-    
+    justify-content: space-between;
+    flex-direction: column;
 }

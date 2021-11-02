@@ -5,6 +5,8 @@ const ctx_hotbar = c_hotbar.getContext('2d')
 const ctx = c_main.getContext('2d')
 let info = document.getElementById("info")
 let gameDiv = document.getElementById("game")
+let itemBox = document.getElementById("items")
+let header = document.getElementById("info-h1")
 game.appendChild(c_main)
 game.appendChild(c_hotbar)
 c_main.width = 500
@@ -119,8 +121,8 @@ class Highlight {
     }
 }
 class Person {
-    constructor(sex, job){
-        this.sex = sex ? sex : pickRandom(["male","female"])
+    constructor(sex, job) {
+        this.sex = sex ? sex : pickRandom(["male", "female"])
         this.name = generateName(sex)
         this.job = job ? job : "unemployed"
     }
@@ -131,7 +133,7 @@ let buildings = {
     "0,0": new House(0, 0)
 }
 let highlight
-for(i = 0; i < buildings["0,0"].size; i++){
+for (i = 0; i < buildings["0,0"].size; i++) {
     buildings["0,0"].housing.push(new Person())
 }
 
@@ -163,6 +165,7 @@ c_main.addEventListener('click', (e) => {
         }
     }
     if (tile) displayInfo(tile)
+    e.preventDefault()
 }, false)
 
 c_main.addEventListener('mousedown', (e) => {
@@ -246,14 +249,14 @@ let loop = function (timestamp) {
                 let adjacentFactories = target.detectAdjacent(target.range, Factory)
                 //checks if there are idle people that can be employed at nearby Factories. If so, it employs them.
                 let unemployed = []
-                    for (let element of target.housing){
-                        if (element.job == "unemployed") unemployed.push(element)
+                for (let element of target.housing) {
+                    if (element.job == "unemployed") unemployed.push(element)
                 }
                 if (unemployed.length > 0) {
                     for (factory of adjacentFactories) {
                         if (factory.workforce.length < factory.size) {
                             let toEmploy = unemployed.splice(0, factory.size - factory.workforce.length)
-                            for (let worker of toEmploy){
+                            for (let worker of toEmploy) {
                                 factory.workforce.push(worker)
                                 worker.job = factory
                             }
@@ -314,23 +317,38 @@ function gridLines(style) {
     }
 }
 
-function displayInfo(tile){
+function displayInfo(tile) {
+    //this implementation is very non-specific and isnt based on a per-value basis. a better implementation would be value specific formatting which would take some constant management to uphold, especially as the number of buildings increases. this is a polish thing that isnt really a todo if its just developers using it as a debug tool.
+
     let type = tile.constructor.name
     let keys = Object.keys(tile)
-    let itemBox = document.getElementById("items")
-    let header = document.getElementById("info-h1")
 
-    header.innerHTML = tile.constructor.name
-    for (let key of keys){
+    header.innerHTML = type
+
+    removeAllChildNodes(itemBox)
+    for (let key of keys) {
         let valid = ["size", "housing", "range", "hours", "income", "workforce"]
-        if (valid.includes(key)){
+        if (valid.includes(key)) {
             let value = tile[key]
             let element = document.createElement('div')
-            if(typeof value !== "object") element.innerHTML = capitalize(key) + ": " + value 
+            if (typeof value !== "object") element.innerHTML = capitalize(key) + ": " + value
             else {
                 element.innerHTML = capitalize(key) + ":"
-                for (i of value){
-                    element.innerHTML += " " + i.name + ","
+                for (i of value) {
+                    let constructor
+                    try {
+                        constructor = i.constructor.name
+                    } catch (error) {
+                        constructor = null
+                    }
+                    switch (constructor) {
+                        case 'Person':
+                            element.innerHTML += " " + i.name + ","
+                            break
+                        case 'Number':
+                            element.innerHTML += " " + i + ","
+                            break
+                    }
                 }
                 element.innerHTML = element.innerHTML.substring(0, element.innerHTML.length - 1)
             }
@@ -339,9 +357,15 @@ function displayInfo(tile){
     }
 }
 
-const capitalize = (s) => {
+function capitalize(s){
     if (typeof s !== 'string') return ''
     return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function removeAllChildNodes(parent) {
+    while (parent.firstChild) {
+        parent.removeChild(parent.firstChild);
+    }
 }
 
 requestAnimationFrame(loop)

@@ -31,7 +31,7 @@ let translation = {
 
 /* TODO
     - Fix how the info screen looks lol
-
+    - I made a change to the code
 
     BUGS
  
